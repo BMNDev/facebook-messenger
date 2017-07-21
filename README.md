@@ -8,7 +8,6 @@
 [![Dependency Status](https://img.shields.io/gemnasium/hyperoslo/facebook-messenger.svg?style=flat)](https://gemnasium.com/hyperoslo/facebook-messenger)
 [![Code Climate](https://img.shields.io/codeclimate/github/hyperoslo/facebook-messenger.svg?style=flat)](https://codeclimate.com/github/hyperoslo/facebook-messenger)
 [![Coverage Status](https://img.shields.io/coveralls/hyperoslo/facebook-messenger.svg?style=flat)](https://coveralls.io/r/hyperoslo/facebook-messenger)
-[![Join the chat at https://gitter.im/hyperoslo/facebook-messenger](https://badges.gitter.im/hyperoslo/facebook-messenger.svg)](https://gitter.im/hyperoslo/facebook-messenger?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 ## Installation
 
@@ -158,6 +157,24 @@ Bot.on :message do |message|
 end
 ```
 
+##### Record messages
+
+You can keep track of messages sent to the human:
+
+```ruby
+Bot.on :message_echo do |message_echo|
+  message_echo.id          # => 'mid.1457764197618:41d102a3e1ae206a38'
+  message_echo.sender      # => { 'id' => '1008372609250235' }
+  message_echo.seq         # => 73
+  message_echo.sent_at     # => 2016-04-22 21:30:36 +0200
+  message_echo.text        # => 'Hello, bot!'
+  message_echo.attachments # => [ { 'type' => 'image', 'payload' => { 'url' => 'https://www.example.com/1.jpg' } } ]
+
+  # Log or store in your storage method of choice (skynet, obviously)
+end
+```
+
+
 #### Send to Facebook
 
 When the human clicks the [Send to Messenger button][send-to-messenger-plugin]
@@ -287,9 +304,6 @@ Facebook::Messenger::Profile.set({
 Follow the [Quick Start][quick-start] guide to create an Application on
 Facebook.
 
-*Note*: Don't subscribe to `message_echoes`; it'll echo your bot's own messages
-back to you, effectively DDOSing yourself.
-
 [quick-start]: https://developers.facebook.com/docs/messenger-platform/guides/quick-start
 
 ### Make a configuration provider
@@ -309,16 +323,36 @@ to keep track of access tokens, app secrets and verify tokens for each of them:
 
 ```ruby
 class ExampleProvider < Facebook::Messenger::Configuration::Providers::Base
+  # Verify that the given verify token is valid.
+  #
+  # verify_token - A String describing the application's verify token.
+  #
+  # Returns a Boolean representing whether the verify token is valid.
   def valid_verify_token?(verify_token)
     bot.exists?(verify_token: verify_token)
   end
 
+  # Find the right application secret.
+  #
+  # page_id - An Integer describing a Facebook Page ID.
+  #
+  # Returns a String describing the application secret.
   def app_secret_for(page_id)
     bot.find_by(page_id: page_id).app_secret
   end
 
-  def access_token_for(page_id)
-    bot.find_by(page_id: page_id).access_token
+  # Find the right access token.
+  #
+  # recipient - A Hash describing the `recipient` attribute of the message coming
+  #             from Facebook.
+  #
+  # Note: The naming of "recipient" can throw you off, but think of it from the
+  # perspective of the message: The "recipient" is the page that receives the
+  # message.
+  #
+  # Returns a String describing an access token.
+  def access_token_for(recipient)
+    bot.find_by(page_id: recipient['id']).access_token
   end
 
   private
@@ -341,6 +375,11 @@ from Facebook:
 ```ruby
 Facebook::Messenger::Subscriptions.subscribe(access_token: access_token)
 ```
+
+You only need to subscribe your page once. As long as your bot works and
+responds to Messenger's requests in a timely fashion it will remain
+subscribed, but if your bot crashes or otherwise becomes unavailable Messenger
+may unsubscribe it and you'll have to subscribe again.
 
 ### Run it
 
@@ -401,7 +440,7 @@ unless Rails.env.production?
     bot_files.each{ |file| require_dependency file }
   end
 
-  ActionDispatch::Callbacks.to_prepare do
+  ActiveSupport::Reloader.to_prepare do
     bot_reloader.execute_if_updated
   end
 
@@ -442,11 +481,21 @@ https://github.com/hyperoslo/facebook-messenger.
 * [Rubotnik](https://github.com/progapandist/rubotnik-boilerplate) is a boilerplate
 for Facebook Messenger, and a great place to start if you're new to bots.
 
-## Hyper loves you
+* [Chatwoot](http://chatwoot.com/) use Facebook Messenger to integrate their customer
+support bots with, well, Facebook Messenger.
 
-[Hyper] made this. We're a bunch of folks who love building things. You should
-[tweet us] if you can't get it to work. In fact, you should tweet us anyway.
-If you're using Facebook Messenger, we probably want to [hire you].
+* [Botamp](https://botamp.com) is the all-in-one solution for Marketing Automation via messaging apps.
+
+## I love you
+
+Johannes Gorset made this. You should [tweet me](http://twitter.com/jgorset) if you can't get it
+to work. In fact, you should tweet me anyway.
+
+## I love Schibsted
+
+I work at [Schibsted Products & Technology](https://github.com/schibsted) with a bunch of awesome folks
+who are every bit as passionate about building things as I am. If you're using Facebook Messenger,
+you should probably join us.
 
 [Hyper]: https://github.com/hyperoslo
 [tweet us]: http://twitter.com/hyperoslo
